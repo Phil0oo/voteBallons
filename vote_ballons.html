@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ballon</title>
+    <style>
+        :root{
+            --ballon_size:50px;
+            --zones_width:800px;
+            --zones_height:600px;
+        }
+        .votesContainer {
+            position: absolute;
+            width: 95%;
+            height: 95%;
+            border: 1px solid brown;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            margin: 0px;
+            padding: 0px;
+        }
+        .voteZones {
+            position: relative;
+            margin: 0px;
+            padding: 0px;
+            width: 100%;
+            height: 100%;
+            border: 1px solid brown;
+            overflow: hidden;
+            flex:1 1 auto;
+            display: flex;
+            flex-direction: row;
+        }
+
+        .zone {
+            margin: 0px;
+            padding: 0px;
+            height: 100%;
+            border: 1px solid brown;
+            flex:1 1 auto;
+        }
+
+        #voting_zone{flex-grow: 2.5;}
+
+        .ballon {
+            position: relative;
+            width: 50px;
+            height: 75px;
+            background-color: red;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+
+        .ballon img {
+    	width: 80%;
+	    filter: grayscale(100%);
+        }
+
+        .ballon.clicked {
+            transform: scale(1.5);
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div class="votesContainer" id="votesContainer">
+     <div id="vote_zones" class="voteZones">
+        <div id="keep_zone" class="zone">
+        </div>
+        <div id="voting_zone" class="zone">
+        </div>
+        <div id="bin_zone" class="zone">
+            <!--<div id="5" class="ballon">5</div>-->
+        </div>
+     </div>
+    </div>
+    <script>
+        const moveTriggerX=15;
+        const Zones=[];
+        const zones=document.getElementById("vote_zones");
+        
+        const pick={}
+
+    class voteZone {
+  constructor(id) {
+    this.id=id;
+    Zones.push(this);
+    this.pos=Zones.length;
+    this.zone=document.getElementById(id+"_zone");
+    this.votes=[];
+  }
+  add(ballonId) {
+    this.votes.push(ballonId);    
+  }
+  remove(ballonId) {
+    let pos=this.votes.indexOf(ballonId);
+    this.votes.slpice(pos,1);    
+  }
+
+  }
+
+        const keep=new voteZone("keep"),voting=new voteZone("voting"),bin=new voteZone("bin");
+
+    class Ballon {
+        constructor(titre, content="none", zone=voting.zone) {
+            this.zone = zone;
+            this.id = titre;
+            this.x = 0;
+            this.y = 0;
+            this.v = (Math.random() * 2 + 0.2);
+            this.h=0;
+            this.ballonElement = document.createElement('div');
+            this.ballonElement.className = 'ballon';
+            this.ballonElement.id = titre;
+            this.ballonElement.innerHTML = content=="none"?titre:`<img src="./${content}" alt="image ${content} for ${titre}" />`;
+            this.ballonElement.title=titre;
+            this.zone.appendChild(this.ballonElement);
+            this.positionBallon();
+
+            //this.moveInterval = this.moveBallon();
+            this.setPastelColor();
+        }
+
+        positionBallon() {
+            const zoneRect = this.zone.getBoundingClientRect();
+            const randomX = Math.floor(Math.random() * (zoneRect.width - this.ballonElement.offsetWidth));
+            const randomY = Math.floor(Math.random() * (zoneRect.height - this.ballonElement.offsetHeight));
+            this.x = randomX;
+            this.y = randomY;
+            this.ballonElement.style.left = `${Math.floor(100*randomX/zoneRect.width)}%`;
+            this.ballonElement.style.top = `${Math.floor(100*randomY/zoneRect.height)}%`;
+        }
+        
+setPastelColor() {
+            const pastelColor = generatePastelColor();
+            this.ballonElement.style.backgroundColor = pastelColor;
+        }
+    }
+    
+    function generatePastelColor() {
+            const r = Math.floor(Math.random() * 128 + 127); // 128 to 255
+            const g = Math.floor(Math.random() * 128 + 127); // 128 to 255
+            const b = Math.floor(Math.random() * 128 + 127); // 128 to 255
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        let voteView=zones.getClientRects();
+
+        let X=voteView.right;
+        
+        const candidats=["image1.jpg","image2.jpg"];//,"<b>2</b>","<b>3</b>","<b>4</b>","<b>5</b>","<b>16</b>"];
+        const lesBallons=[];
+        candidats.forEach ((b,i)=>{lesBallons[i] = new Ballon(b,b);});
+
+
+
+//mouseEvent
+        function    handlePointerDown(event) {
+                event.stopPropagation();
+                //console.log(event.target);
+                pick.initialX=event.clientX;
+//                pick.initialY=event.clientY;
+                theBallon=event.target.closest(".ballon");
+                if (theBallon){
+                    console.log(`Ballon ${theBallon.id} clicked at position: ${pick.initialX}`, theBallon.getBoundingClientRect());
+                    pick.ballonId=theBallon.id;
+                    pick.zoneId=theBallon.closest(".zone").id;
+                    pick.zonePos=Zones.findIndex((z)=>(z.id+"_zone")==pick.zoneId);
+                    theBallon.classList.add('clicked');
+                }else{console.log("Clicked away from any Ballon");pick.ballonId="";}
+                /*clearInterval(this.moveInterval);
+                const rect = this.ballonElement.getBoundingClientRect();
+                */
+            }
+            
+        function    handlePointerUp(event) {
+                event.stopPropagation();
+                console.log(event.target);
+                pick.endX=event.clientX;
+//              pick.endY=event.clientY;
+                if (pick.ballonId){
+                    theBallon=document.getElementById(pick.ballonId);
+                    console.log(`Ballon ${theBallon.id} un-clicked at position: ${pick.endX}`);
+                    theBallon.classList.remove('clicked');
+                    pick.ballonId="";
+                }else{console.log("Clicked away from any Ballon")}
+
+//                this.moveInterval = this.moveBallon();
+            }
+
+        function    handlePointerMove(event) {
+            event.stopPropagation();
+            if (pick.ballonId){
+                    const theBallon=document.getElementById(pick.ballonId);
+                    let nZonePos=pick.zonePos;//new Zone "position"(index) in the Zones array
+                    console.log("zone:",nZonePos)
+                    pick.previousX=pick.endX;
+                    pick.endX=event.clientX;
+        //          pick.endY=event.clientY;
+        //          console.log(`Ballon ${theBallon.id} moved at position: ${pick.endX}`);
+                    const deltaX = pick.endX - pick.initialX;
+                    const deltax=pick.endX - pick.previousX;
+                    if (Math.abs(deltaX)>moveTriggerX){
+                        if (deltaX > 0) {
+                            console.log(`Pointer moved more than 10px to the right. Current position:`, pick.endX);
+                            //move ballon to next zone right if there is one
+                            nZonePos=Math.min(pick.zonePos+1,Zones.length-1);
+                        }else if (deltaX<0){
+                            console.log(`Pointer moved more than 10px to the left. Current position:`, pick.endX);
+                            //move ballon to next zone left if there is one
+                            nZonePos=Math.max(pick.zonePos-1,0);
+                        }
+                    console.log(pick.zonePos,', ',deltaX,', ',nZonePos)
+                    Zones[nZonePos].zone.appendChild(theBallon);
+                    // position may be wrong !
+                    let leftX=theBallon.style.left;
+                    let zoneW=Zones[nZonePos].zone.getBoundingClientRect().width;
+                    leftX=leftX.includes("px")?parseInt(theBallon.style.left,10):leftX.includes("%")?parseInt(theBallon.style.left,10)*zoneW:leftX;
+                    theBallon.style.left = `${(leftX % zoneW)/zoneW}%`;
+
+                    const fakePointerUp = new MouseEvent("pointerup", {view: window,bubbles: true, cancelable: true});
+  const upReturn = theBallon.dispatchEvent(fakePointerUp);
+ // pick.ballonId="";
+                    } else {
+                    let leftX=theBallon.style.left;
+                    let zoneW=Zones[nZonePos].zone.getBoundingClientRect().width;
+                    leftX=leftX.includes("px")?parseInt(theBallon.style.left,10):leftX.includes("%")?parseInt(theBallon.style.left,10)*zoneW:leftX;
+                    leftX=Math.min(Math.max(leftX+deltax,0),zoneW-theBallon.offsetWidth)
+
+                    theBallon.style.left = `${leftX/zoneW}%`;
+                    }
+
+                }    
+            }
+                
+
+    zones.addEventListener('pointerdown', this.handlePointerDown);
+    zones.addEventListener('pointermove', this.handlePointerMove);
+    zones.addEventListener('pointerup', this.handlePointerUp);
+//mouseEvent
+    </script>
+    <script id="animation">
+
+
+
+/*
+        var elem = document.getElementById('animated'),
+    top = parseInt(elem.style.marginTop, 10) || 0,
+    step = 1;
+
+function animate() {
+    if (top < 100) {
+        requestAnimationFrame(animate);
+        elem.style.marginTop = top + 'px';
+        top += step;
+    }
+}*/
+
+function moveBallons(){
+    lesBallons.forEach((b)=>moveBallon(b))
+    requestAnimationFrame(moveBallons);
+}
+moveBallons();
+
+
+function moveBallon(b) {
+            const zoneRect = b.zone.getBoundingClientRect();
+                if(!b.ballonElement.classList.contains("clicked")){
+                    b.y -= b.v;
+                    if (b.y <= 0 - b.ballonElement.offsetHeight) {
+                        b.y = zoneRect.height + b.ballonElement.offsetHeight;
+                    }
+                    b.ballonElement.style.top = `${100*b.y/zoneRect.height}%`;
+                }
+            }
+    </script>
+</body>
+</html>
