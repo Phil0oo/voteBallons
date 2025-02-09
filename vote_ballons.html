@@ -15,14 +15,15 @@
             position: absolute;
             width: 95%;
             height: 95%;
-            border: 1px solid brown;
+            /*border: 1px solid brown;*/
             overflow: hidden;
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
+            justify-content: center;
             margin: 0px;
             padding: 0px;
             background: rgb(190,232,251);
-background: linear-gradient(0deg, rgba(190,232,251,1) 0%, rgba(143,191,244,1) 65%, rgba(101,133,242,1) 100%);
+            background: linear-gradient(0deg, rgba(190,232,251,1) 0%, rgba(157,179,255,1) 65%, rgba(157,179,255,1) 100%);
         }
         .voteZones {
             position: relative;
@@ -30,7 +31,7 @@ background: linear-gradient(0deg, rgba(190,232,251,1) 0%, rgba(143,191,244,1) 65
             padding: 0px;
             width: 100%;
             height: 100%;
-            border: 1px solid brown;
+            /*border: 1px solid brown;*/
             overflow: hidden;
             flex:1 1 auto;
             display: flex;
@@ -41,12 +42,21 @@ background: linear-gradient(0deg, rgba(190,232,251,1) 0%, rgba(143,191,244,1) 65
             margin: 0px;
             padding: 0px;
             height: 100%;
-            border: 1px solid brown;
+            /*border: 1px solid brown;*/
             flex:1 1 auto;
             position: relative;
         }
 
         #voting_zone{flex-grow: 2.5;}
+        #keep_zone {
+            /* border: none; */
+            box-shadow: 10px 0px 5px #bbffa380;
+            background: #bbffa380;
+        }
+        #bin_zone {
+            box-shadow: -10px 0px 5px #f036177a;
+            background: #f036177a;
+        }
 
         .ballon {
             position: absolute;
@@ -58,38 +68,103 @@ background: linear-gradient(0deg, rgba(190,232,251,1) 0%, rgba(143,191,244,1) 65
             align-items: center;
             justify-content: center;
             border-radius: 50%;
+            filter: drop-shadow(5px 5px 5px #0003);
+            box-shadow: inset -3px -3px 7px #0005;
         }
 
         .ballon img {
             width: 80%;
             max-height: var(--ballon_width);
 	        filter: grayscale(100%);
+            pointer-events: none;
         }
 
         .ballon.clicked {
             transform: scale(1.5);
             z-index: 10;
         }
+        .ballon.clicked:hover {cursor: none;}
+
+        .compteur {
+	position: absolute;
+	width: 2em;
+	height: 2em;
+	background: #80aed7a6;
+	align-content: center;
+	text-align: center;
+	border-radius: 1em;
+	margin: 1em 1em;
+	font-size: larger;
+	color: white;
+}
+.compteur::before {
+	content: "🎈";
+	filter: brightness(200%);
+}
+
+#chrono {
+    position: absolute;
+    width: 4em;
+	height: 2.5em;
+	background: #80aed7a6;
+	align-content: center;
+	text-align: center;
+	border-radius: 1.25em;
+	margin: 0.6em auto;
+	font-size: xx-large;
+	color: white;
+}
+#chrono::before{
+    content: "⏱ ";
+}
+
+/* Animations */
+.pulse {
+    animation: pulse-anim 1s ease;
+    animation-iteration-count: infinite; 
+    opacity: 0.5;
+}
+@keyframes pulse-anim {
+    0% { 
+        opacity: 0.5;
+        transform: scale(0.5);
+    }
+    50% { 
+        opacity: 1.0;
+        transform: scale(1.5);
+    }
+    100% { 
+        opacity: 0.5;
+        transform: scale(1);
+    }
+}
+
+
     </style>
 </head>
 <body>
     <div class="votesContainer" id="votesContainer">
      <div id="vote_zones" class="voteZones">
         <div id="keep_zone" class="zone">
+            <div class="compteur"></div>
         </div>
         <div id="voting_zone" class="zone">
+            <div class="compteur"></div>
         </div>
         <div id="bin_zone" class="zone">
+            <div class="compteur"></div>
             <!--<div id="5" class="ballon">5</div>-->
         </div>
      </div>
+     <div id="chrono">200s</div>
     </div>
     <script>
         const moveTriggerX=15;
         const Zones=[];
         const zones=document.getElementById("vote_zones");
-        
+        const chrono={tps:0,el:document.getElementById("chrono"),start:""};//seconds
         const pick={}
+        const pause=false;
 
     class voteZone {
   constructor(id) {
@@ -97,14 +172,17 @@ background: linear-gradient(0deg, rgba(190,232,251,1) 0%, rgba(143,191,244,1) 65
     Zones.push(this);
     this.pos=Zones.length;
     this.zone=document.getElementById(id+"_zone");
+    this.compteurEl=this.zone.getElementsByClassName("compteur")[0];
     this.votes=[];
   }
   add(ballonId) {
-    this.votes.push(ballonId);    
+    this.votes.push(ballonId);
+    this.compteurEl.innerHTML=this.votes.length;
   }
   remove(ballonId) {
     let pos=this.votes.indexOf(ballonId);
-    this.votes.slpice(pos,1);    
+    this.votes.splice(pos,1);
+    this.compteurEl.innerHTML=this.votes.length;    
   }
 
   }
@@ -114,6 +192,7 @@ background: linear-gradient(0deg, rgba(190,232,251,1) 0%, rgba(143,191,244,1) 65
     class Ballon {
         constructor(titre, content="none", zone=voting.zone) {
             this.zone = zone;
+            this.zoneId=zone.id;
             this.id = titre;
             this.x = 0;
             this.y = 0;
@@ -125,6 +204,8 @@ background: linear-gradient(0deg, rgba(190,232,251,1) 0%, rgba(143,191,244,1) 65
             this.ballonElement.innerHTML = content=="none"?titre:`<img src="./${content}" alt="image ${content} for ${titre}" />`;
             this.ballonElement.title=titre;
             this.zone.appendChild(this.ballonElement);
+            let theZone=Zones.find((z)=>((z.id+"_zone")==this.zoneId));
+            theZone.add(this.id);
             this.positionBallon();
 
             //this.moveInterval = this.moveBallon();
@@ -141,9 +222,9 @@ background: linear-gradient(0deg, rgba(190,232,251,1) 0%, rgba(143,191,244,1) 65
             this.ballonElement.style.top = `${Math.floor(100*randomY/zoneRect.height)}%`;
         }
         
-setPastelColor() {
-            const pastelColor = generatePastelColor();
-            this.ballonElement.style.backgroundColor = pastelColor;
+        setPastelColor() {
+            this.color = generatePastelColor();
+            this.ballonElement.style.backgroundColor = this.color;
         }
     }
     
@@ -154,30 +235,39 @@ setPastelColor() {
             return `rgb(${r}, ${g}, ${b})`;
         }
 
-        let voteView=zones.getClientRects();
-
-        let X=voteView.right;
+        // let voteView=zones.getClientRects();
+        // let X=voteView.right;
         
         const candidats=["image1.jpg","image2.jpg","image3.png","image4.png","image5.png","image6.png","image7.png"];//,"<b>2</b>","<b>3</b>","<b>4</b>","<b>5</b>","<b>16</b>"];
         const lesBallons=[];
         candidats.forEach ((b,i)=>{lesBallons[i] = new Ballon(b,b);});
 
-
+// prevent unwanted selection
+function clearSelection()
+{
+ if (window.getSelection) {window.getSelection().removeAllRanges();}
+ else if (document.selection) {document.selection.empty();}
+}
 
 //mouseEvent
         function    handlePointerDown(event) {
                 event.stopPropagation();
                 //console.log(event.target);
-                pick.initialX=event.clientX;
-                pick.endX=event.clientX;
 //                pick.initialY=event.clientY;
-                theBallon=event.target.closest(".ballon");
-                if (theBallon){
-                    console.log(`Ballon ${theBallon.id} clicked at position: ${pick.initialX}`, theBallon.getBoundingClientRect());
-                    pick.ballonId=theBallon.id;
-                    pick.zoneId=theBallon.closest(".zone").id;
+                theBallonEl=event.target.closest(".ballon");
+                if (theBallonEl){
+                    theBallon=lesBallons.find((b)=>(b.id==theBallonEl.id));
+                    theBallon.clicked=true;
+                    pick.ballonId=theBallonEl.id;
+                    theZone=theBallonEl.closest(".zone");
+                    pick.zoneId=theZone.id;
                     pick.zonePos=Zones.findIndex((z)=>(z.id+"_zone")==pick.zoneId);
-                    theBallon.classList.add('clicked');
+
+                    pick.initialX=event.clientX-theZone.offsetLeft;
+                    pick.endX=event.clientX-theZone.offsetLeft;
+                    console.log(`Ballon ${theBallonEl.id} clicked at position: ${pick.initialX}`, theBallonEl.getBoundingClientRect());
+
+                    theBallonEl.classList.add('clicked');
                 }else{console.log("Clicked away from any Ballon");pick.ballonId="";}
                 /*clearInterval(this.moveInterval);
                 const rect = this.ballonElement.getBoundingClientRect();
@@ -190,11 +280,13 @@ setPastelColor() {
                 
 //              pick.endY=event.clientY;
                 if (pick.ballonId){
-                    theBallon=document.getElementById(pick.ballonId);
-                    pick.endX=event.clientX;
-                    console.log(`Ballon ${theBallon.id} un-clicked at position: ${pick.endX}`);
-                    theBallon.classList.remove('clicked');
-                    pick.ballonId="";
+                    theBallonEl=document.getElementById(pick.ballonId);
+                    theBallon=lesBallons.find((b)=>(b.id==pick.ballonId));
+                    //theZone=theBallonEl.closest(".zone");
+                    //pick.endX=event.clientX-theZone.offsetLeft;;
+                    console.log(`Ballon ${theBallon.id} un-clicked`);// at position: ${pick.endX}`);
+                    theBallonEl.classList.remove('clicked');
+                    pick.ballonId="";pick.endX="";pick.endY=""; pick.zoneId="";pick.zonePos="";pick.initialX="";pick.previousX="";
                 }else{console.log("Clicked away from any Ballon")}
 
 //                this.moveInterval = this.moveBallon();
@@ -202,12 +294,16 @@ setPastelColor() {
 
         function    handlePointerMove(event) {
             event.stopPropagation();
+            clearSelection();
             if (pick.ballonId){
-                    const theBallon=document.getElementById(pick.ballonId);
+                    const theBallonEl=document.getElementById(pick.ballonId);
+                    let theBallon=lesBallons.find((b)=>(b.id==pick.ballonId));
+                    let oZonePos=pick.zonePos;//old Zone "position"(index) in the Zones array
                     let nZonePos=pick.zonePos;//new Zone "position"(index) in the Zones array
+                    theZone=theBallonEl.closest(".zone");
                     console.log("zone:",nZonePos)
                     pick.previousX=pick.endX;
-                    pick.endX=event.clientX;
+                    pick.endX=event.clientX-theZone.offsetLeft;
         //          pick.endY=event.clientY;
         //          console.log(`Ballon ${theBallon.id} moved at position: ${pick.endX}`);
                     const deltaX = pick.endX - pick.initialX;
@@ -217,29 +313,32 @@ setPastelColor() {
                             console.log(`Pointer moved more than 10px to the right. Current position:`, pick.endX);
                             //move ballon to next zone right if there is one
                             nZonePos=Math.min(pick.zonePos+1,Zones.length-1);
+
                         }else if (deltaX<0){
                             console.log(`Pointer moved more than 10px to the left. Current position:`, pick.endX);
                             //move ballon to next zone left if there is one
                             nZonePos=Math.max(pick.zonePos-1,0);
                         }
                     console.log(pick.zonePos,', ',deltaX,', ',nZonePos)
-                    Zones[nZonePos].zone.appendChild(theBallon);
+                    Zones[nZonePos].zone.appendChild(theBallonEl);
+                    Zones[oZonePos].remove(pick.ballonId);
+                    Zones[nZonePos].add(pick.ballonId);
                     // position may be wrong !
-                    let leftX=theBallon.style.left;
-                    let zoneW=Zones[nZonePos].zone.getBoundingClientRect().width;
-                    leftX=leftX.includes("px")?parseInt(theBallon.style.left,10):leftX.includes("%")?parseInt(theBallon.style.left,10)*zoneW:leftX;
-                    theBallon.style.left = `${(leftX % zoneW)/zoneW}%`;
+                    //let leftX=theBallon.style.left;
+                    //let zoneW=Zones[nZonePos].zone.getBoundingClientRect().width;
+                    //leftX=leftX.includes("px")?parseInt(theBallon.style.left,10):leftX.includes("%")?parseInt(theBallon.style.left,10)*zoneW:leftX;
+                    //theBallon.style.left = `${(leftX % zoneW)/zoneW}%`;
 
                     const fakePointerUp = new MouseEvent("pointerup", {view: window,bubbles: true, cancelable: true});
-  const upReturn = theBallon.dispatchEvent(fakePointerUp);
+  const upReturn = theBallonEl.dispatchEvent(fakePointerUp);
  // pick.ballonId="";
                     } else {
-                    let leftX=theBallon.style.left;
+                    let leftX=theBallonEl.style.left;
                     let zoneW=Zones[nZonePos].zone.getBoundingClientRect().width;
-                    leftX=leftX.includes("px")?parseInt(theBallon.style.left,10):leftX.includes("%")?parseInt(theBallon.style.left,10)*zoneW:leftX;
-                    leftX=Math.min(Math.max(leftX+deltax,0),zoneW-theBallon.offsetWidth)
+                    leftX=leftX.includes("px")?parseInt(leftX,10):leftX.includes("%")?parseFloat(leftX,10)*zoneW/100:leftX;
+                    leftX=Math.min(Math.max(leftX+deltax,0),zoneW-theBallonEl.offsetWidth)
 
-                    theBallon.style.left = `${leftX/zoneW}%`;
+                    theBallonEl.style.left = `${100*leftX/zoneW}%`;
                     }
 
                 }    
@@ -252,29 +351,6 @@ setPastelColor() {
 //mouseEvent
     </script>
     <script id="animation">
-
-
-
-/*
-        var elem = document.getElementById('animated'),
-    top = parseInt(elem.style.marginTop, 10) || 0,
-    step = 1;
-
-function animate() {
-    if (top < 100) {
-        requestAnimationFrame(animate);
-        elem.style.marginTop = top + 'px';
-        top += step;
-    }
-}*/
-
-function moveBallons(){
-    lesBallons.forEach((b)=>moveBallon(b))
-    requestAnimationFrame(moveBallons);
-}
-moveBallons();
-
-
 function moveBallon(b) {
             const zoneRect = b.zone.getBoundingClientRect();
                 if(!b.ballonElement.classList.contains("clicked")){
@@ -285,6 +361,36 @@ function moveBallon(b) {
                     b.ballonElement.style.top = `${100*b.y/zoneRect.height}%`;
                 }
             }
+
+function runVotes(n){
+    if ( !pause){
+        if(chrono.start===""){chrono.start=n;}
+        else{
+            const ds=Math.floor((n-chrono.start)/1000);
+            //console.log(ds);
+            if(ds>0 && chrono.tps>0){
+                chrono.tps=Math.max(chrono.init-ds,0);
+                chrono.el.innerHTML=chrono.tps+"s";
+                if(chrono.tps<=5){chrono.el.classList.add("pulse")};
+            }
+        }
+        lesBallons.forEach((b)=>moveBallon(b))
+    }    
+    requestAnimationFrame(runVotes);
+}
+
+function start(){
+    chrono.tps=3*lesBallons.length;
+    chrono.init=chrono.tps;
+    chrono.el.innerHTML=chrono.tps+"s";
+    requestAnimationFrame(runVotes)
+}
+
+start()
+
+
+
+
     </script>
 </body>
 </html>
