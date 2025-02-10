@@ -138,8 +138,54 @@
         transform: scale(1);
     }
 }
+/*
 
+    animation-name,
+    animation-duration,
+    animation-timing-function,
+    animation-delay,
+    animation-iteration-count,
+    animation-direction,
+    animation-fill-mode,
+    animation-play-state.
 
+*/
+.warning_color {
+    animation: warning_color-anim 6s ease normal forwards, pulse-anim 1s ease infinite ;
+/*    animation-iteration-count: 1;*/
+/*    animation-fill-mode: forwards;*/
+}
+@keyframes warning_color-anim {
+    0% { 
+        color: gold;
+    }
+    100% { 
+        color:crimson;
+    }
+}
+
+/*modals*/
+.modalsContainer {
+	position: absolute;
+	width: 100%;
+	height: 100%;
+	background: #bed3e65e;
+	backdrop-filter: blur(2px);
+    display: flex;
+}
+.modal-content {
+	align-content: center;
+	text-align: center;
+	width: 90%;
+	height: 90%;
+	background: #938ba6c7;
+	color: white;
+	font-size: xx-large;
+	margin: auto;
+    border-radius: 0.6em;
+}
+
+.hide {display: none;}
     </style>
 </head>
 <body>
@@ -157,6 +203,8 @@
         </div>
      </div>
      <div id="chrono">200s</div>
+     <div class="modalsContainer" id="modalsContainer">
+    </div>
     </div>
     <script>
         const moveTriggerX=15;
@@ -164,13 +212,13 @@
         const zones=document.getElementById("vote_zones");
         const chrono={tps:0,el:document.getElementById("chrono"),start:""};//seconds
         const pick={}
-        const pause=false;
+        var pause=false;
 
     class voteZone {
   constructor(id) {
     this.id=id;
     Zones.push(this);
-    this.pos=Zones.length;
+    this.pos=Zones.length-1;
     this.zone=document.getElementById(id+"_zone");
     this.compteurEl=this.zone.getElementsByClassName("compteur")[0];
     this.votes=[];
@@ -178,11 +226,13 @@
   add(ballonId) {
     this.votes.push(ballonId);
     this.compteurEl.innerHTML=this.votes.length;
+    return this.votes.length
   }
   remove(ballonId) {
     let pos=this.votes.indexOf(ballonId);
     this.votes.splice(pos,1);
-    this.compteurEl.innerHTML=this.votes.length;    
+    this.compteurEl.innerHTML=this.votes.length;
+    return this.votes.length    
   }
 
   }
@@ -321,8 +371,10 @@ function clearSelection()
                         }
                     console.log(pick.zonePos,', ',deltaX,', ',nZonePos)
                     Zones[nZonePos].zone.appendChild(theBallonEl);
-                    Zones[oZonePos].remove(pick.ballonId);
+                    let r=Zones[oZonePos].remove(pick.ballonId);
                     Zones[nZonePos].add(pick.ballonId);
+                    theBallon.zone=Zones[nZonePos].zone;
+                    theBallon.zoneId=Zones[nZonePos].zone.id;
                     // position may be wrong !
                     //let leftX=theBallon.style.left;
                     //let zoneW=Zones[nZonePos].zone.getBoundingClientRect().width;
@@ -332,6 +384,9 @@ function clearSelection()
                     const fakePointerUp = new MouseEvent("pointerup", {view: window,bubbles: true, cancelable: true});
   const upReturn = theBallonEl.dispatchEvent(fakePointerUp);
  // pick.ballonId="";
+                    if (r==0 && oZonePos==voting.pos){
+                        endVoting();
+                    }
                     } else {
                     let leftX=theBallonEl.style.left;
                     let zoneW=Zones[nZonePos].zone.getBoundingClientRect().width;
@@ -364,31 +419,67 @@ function moveBallon(b) {
 
 function runVotes(n){
     if ( !pause){
-        if(chrono.start===""){chrono.start=n;}
+        if(chrono.start===""){chrono.start=n;chrono.lastds=0}
         else{
             const ds=Math.floor((n-chrono.start)/1000);
             //console.log(ds);
-            if(ds>0 && chrono.tps>0){
+            if(ds>chrono.lastds && chrono.tps>0){
                 chrono.tps=Math.max(chrono.init-ds,0);
                 chrono.el.innerHTML=chrono.tps+"s";
-                if(chrono.tps<=5){chrono.el.classList.add("pulse")};
+                chrono.lastds=ds;
+                if(chrono.tps<=10 && !chrono.el.classList.contains("pulse")){chrono.el.classList.add("pulse")};
+                if(chrono.tps<=5 && !chrono.el.classList.contains("warning_color")){chrono.el.classList.add("warning_color")}
+
             }
         }
         lesBallons.forEach((b)=>moveBallon(b))
+        requestAnimationFrame(runVotes);
     }    
-    requestAnimationFrame(runVotes);
+//    requestAnimationFrame(runVotes);
+console.log("voting...")
 }
 
-function start(){
+function startVoting(){
     chrono.tps=3*lesBallons.length;
     chrono.init=chrono.tps;
     chrono.el.innerHTML=chrono.tps+"s";
     requestAnimationFrame(runVotes)
 }
 
-start()
+function endVoting(){
+    console.log("end?");
+    pause=true; //stop ballon animation and chrono
+    modal("voted");
+    console.log("end!",pause);
+}
 
+//modals
+const modals={
+    "welcome":{"content":`<div class="modal-content">
+            <h2>Bienvenue !</h2>
+            <button id="démarrer">Démarrer</button>
+        </div>`,"démarrer":function (){console.log("démarrer");startVoting()}},
+    "voted":{"content":`<div class="modal-content">
+            <h2>Bien joué !</h2>
+            <ul><li>ballon 1</li><li>ballon 3</li></ul>
+            <button id="sauver">Sauver les Résultats</button>
+        </div>`,"sauver":function (){console.log("sauver ",lesBallons);}}
+    }
+function modal(mId){
+    const modalEl=document.getElementById("modalsContainer");
+    const modal=modals[mId];
+    modalEl.innerHTML=modal.content;
+    modalEl.classList.remove("hide");
+    modalEl.addEventListener("click",function(e){
+        console.log(e);
+        if(modal[e.target.id]){
+            modalEl.classList.add("hide");
+            modal[e.target.id]()}
+        //modal?.[e.target.id]()
+    })
+}
 
+modal("welcome")
 
 
     </script>
