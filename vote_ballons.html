@@ -210,9 +210,9 @@
         const moveTriggerX=15;
         const Zones=[];
         const zones=document.getElementById("vote_zones");
-        const chrono={tps:0,el:document.getElementById("chrono"),start:""};//seconds
+        const chrono={tps:0,el:document.getElementById("chrono"),start:"",pause:0};//seconds
         const pick={}
-        var pause=false;
+        //var pause=0,paused=0;
 
     class voteZone {
   constructor(id) {
@@ -418,10 +418,9 @@ function moveBallon(b) {
             }
 
 function runVotes(n){
-    if ( !pause){
+    if ( !chrono.pause){
         if(chrono.start===""){chrono.start=n;chrono.lastds=0}
-        else{
-            const ds=Math.floor((n-chrono.start)/1000);
+        const ds=Math.floor((n-chrono.start)/1000);
             //console.log(ds);
             if(ds>chrono.lastds && chrono.tps>0){
                 chrono.tps=Math.max(chrono.init-ds,0);
@@ -431,7 +430,8 @@ function runVotes(n){
                 if(chrono.tps<=5 && !chrono.el.classList.contains("warning_color")){chrono.el.classList.add("warning_color")}
 
             }
-        }
+            if(chrono.tps==0){
+                chrono.pause=Date.now();modal("relance");return}
         lesBallons.forEach((b)=>moveBallon(b))
         requestAnimationFrame(runVotes);
     }    
@@ -439,8 +439,8 @@ function runVotes(n){
 console.log("voting...")
 }
 
-function startVoting(){
-    chrono.tps=3*lesBallons.length;
+function startVoting(temps=3*lesBallons.length){
+    chrono.tps=temps;
     chrono.init=chrono.tps;
     chrono.el.innerHTML=chrono.tps+"s";
     requestAnimationFrame(runVotes)
@@ -448,35 +448,53 @@ function startVoting(){
 
 function endVoting(){
     console.log("end?");
-    pause=true; //stop ballon animation and chrono
+    chrono.pause=Date.now(); //stop ballon animation and chrono
     modal("voted");
-    console.log("end!",pause);
+    console.log("end!",chrono.pause);
 }
 
 //modals
 const modals={
-    "welcome":{"content":`<div class="modal-content">
-            <h2>Bienvenue !</h2>
-            <button id="démarrer">Démarrer</button>
-        </div>`,"démarrer":function (){console.log("démarrer");startVoting()}},
-    "voted":{"content":`<div class="modal-content">
-            <h2>Bien joué !</h2>
+    "welcome":{"content":`<h2>Bienvenue !</h2>
+            <button id="démarrer">Démarrer</button>`,
+            "démarrer":function (){console.log("démarrer");startVoting()}},
+    "voted":{"content":`<h2>Bien joué !</h2>
+            <button id="rejouer">Rejouer 😉</button>
             <ul><li>ballon 1</li><li>ballon 3</li></ul>
-            <button id="sauver">Sauver les Résultats</button>
-        </div>`,"sauver":function (){console.log("sauver ",lesBallons);}}
+            <button id="mail">Envoyer les résultats</button>`,
+            "mail":function (){console.log("sauver ",lesBallons);mail("o@m.com","Résultat de mon vote",`${JSON.stringify(lesBallons)}`)},"rejouer":function (){location.reload();}},
+    "relance":{"content": function(){return `<h2>Le temps est écoulé!</h2>
+            <p>Il reste ${voting.votes.length} ballons.</p>
+            <button id="finir">Finir!</button>`},
+            "finir":function(){chrono.start=performance.now();chrono.pause="";startVoting(3*voting.votes.length)}},
+    "Merci":{"content":`<h2>Merci</h2>
+            <p>votre gestionnaire de courriel va s'ouvrir pour envoyer vos résultats.<br>Merci d'avoir voter</p>
+            <button id="rejouer">Rejouer ?</button>`,
+            "rejouer":function (){location.reload();}}
     }
 function modal(mId){
     const modalEl=document.getElementById("modalsContainer");
     const modal=modals[mId];
-    modalEl.innerHTML=modal.content;
+    const mcontent=document.createElement("div");
+    mcontent.classList.add('modal-content');
+    mcontent.innerHTML=typeof(modal.content)=="function"?modal.content():modal.content;
+    modalEl.appendChild(mcontent);
     modalEl.classList.remove("hide");
     modalEl.addEventListener("click",function(e){
         console.log(e);
         if(modal[e.target.id]){
             modalEl.classList.add("hide");
+            modalEl.innerHTML="";
             modal[e.target.id]()}
         //modal?.[e.target.id]()
     })
+}
+
+//mail results
+function mail(to,subject,content){
+    //window.open(`mailto:${to}}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(content)}`);
+    window.location.href = `mailto:${to}}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(content)}`;
+    modal("Merci");
 }
 
 modal("welcome")
