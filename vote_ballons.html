@@ -210,7 +210,7 @@
         const moveTriggerX=15;
         const Zones=[];
         const zones=document.getElementById("vote_zones");
-        const chrono={tps:0,el:document.getElementById("chrono"),start:"",pause:0};//seconds
+        const chrono={tps:0,el:document.getElementById("chrono"),start:"",pause:0,init:""};//seconds
         const pick={}
         //var pause=0,paused=0;
 
@@ -318,7 +318,9 @@ function clearSelection()
                     console.log(`Ballon ${theBallonEl.id} clicked at position: ${pick.initialX}`, theBallonEl.getBoundingClientRect());
 
                     theBallonEl.classList.add('clicked');
-                }else{console.log("Clicked away from any Ballon");pick.ballonId="";}
+                }else{
+                    console.log("Clicked away from any Ballon");pick.ballonId="";
+                }
                 /*clearInterval(this.moveInterval);
                 const rect = this.ballonElement.getBoundingClientRect();
                 */
@@ -403,6 +405,8 @@ function clearSelection()
     zones.addEventListener('pointerdown', this.handlePointerDown);
     zones.addEventListener('pointermove', this.handlePointerMove);
     zones.addEventListener('pointerup', this.handlePointerUp);
+    
+
 //mouseEvent
     </script>
     <script id="animation">
@@ -419,30 +423,41 @@ function moveBallon(b) {
 
 function runVotes(n){
     if ( !chrono.pause){
-        if(chrono.start===""){chrono.start=n;chrono.lastds=0}
-        const ds=Math.floor((n-chrono.start)/1000);
+        if(chrono.start){chrono.lastds=n;chrono.start=false;}
+        const ds=(n-chrono.lastds)/1000;
+        chrono.lastds=n;
             //console.log(ds);
-            if(ds>chrono.lastds && chrono.tps>0){
-                chrono.tps=Math.max(chrono.init-ds,0);
-                chrono.el.innerHTML=chrono.tps+"s";
-                chrono.lastds=ds;
+            if(ds>0 && chrono.tps>0){
+                chrono.tps=Math.max(chrono.tps-ds,0);
+                chrono.el.innerHTML=Math.ceil(chrono.tps)+"s";
+                //chrono.lastds=ds;
                 if(chrono.tps<=10 && !chrono.el.classList.contains("pulse")){chrono.el.classList.add("pulse")};
                 if(chrono.tps<=5 && !chrono.el.classList.contains("warning_color")){chrono.el.classList.add("warning_color")}
 
             }
             if(chrono.tps==0){
-                chrono.pause=Date.now();modal("relance");return}
+                //chrono.pause=Date.now();modal("relance");
+                pauseVoting();
+                return;
+            }
         lesBallons.forEach((b)=>moveBallon(b))
         requestAnimationFrame(runVotes);
     }    
 //    requestAnimationFrame(runVotes);
-console.log("voting...")
+//console.log("voting...")
+}
+
+
+function pauseVoting(){
+    chrono.pause=Date.now();modal("relance");
 }
 
 function startVoting(temps=3*lesBallons.length){
     chrono.tps=temps;
-    chrono.init=chrono.tps;
+    if(!chrono.init){chrono.init=Date.now(); chrono.runtime=0;}
     chrono.el.innerHTML=chrono.tps+"s";
+    chrono.el.classList.remove("pulse","warning_color");
+    chrono.start=true;
     requestAnimationFrame(runVotes)
 }
 
@@ -463,10 +478,13 @@ const modals={
             <ul><li>ballon 1</li><li>ballon 3</li></ul>
             <button id="mail">Envoyer les résultats</button>`,
             "mail":function (){console.log("sauver ",lesBallons);mail("o@m.com","Résultat de mon vote",`${JSON.stringify(lesBallons)}`)},"rejouer":function (){location.reload();}},
-    "relance":{"content": function(){return `<h2>Le temps est écoulé!</h2>
+    "relance":{"content": function(){let rtps=chrono.tps; let titre;if(rtps==0){titre="Le temps est écoulé!"}else{titre="Plus que "+Math.ceil(rtps)+" secondes"};
+            let htmlcontent = `<h2>${titre}</h2>
             <p>Il reste ${voting.votes.length} ballons.</p>
-            <button id="finir">Finir!</button>`},
-            "finir":function(){chrono.start=performance.now();chrono.pause="";startVoting(3*voting.votes.length)}},
+            <button id="finir">Finir!</button>`;
+            return htmlcontent;
+        },
+            "finir":function(){chrono.pause="";startVoting(3*voting.votes.length)}},
     "Merci":{"content":`<h2>Merci</h2>
             <p>votre gestionnaire de courriel va s'ouvrir pour envoyer vos résultats.<br>Merci d'avoir voter</p>
             <button id="rejouer">Rejouer ?</button>`,
@@ -489,7 +507,8 @@ function modal(mId){
         //modal?.[e.target.id]()
     })
 }
-
+//
+document.getElementById("chrono").addEventListener('click', ()=>pauseVoting());
 //mail results
 function mail(to,subject,content){
     //window.open(`mailto:${to}}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(content)}`);
