@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -75,48 +76,53 @@
         .ballon img {
             width: 80%;
             max-height: var(--ballon_width);
-	        filter: grayscale(100%);
+            filter: grayscale(100%);
             pointer-events: none;
         }
 
         .ballon.clicked {
-            transform: scale(1.5);
+            transform: scale(2);
             z-index: 10;
         }
         .ballon.clicked:hover {cursor: none;}
 
         .compteur {
-	position: absolute;
-	width: 2em;
-	height: 2em;
-	background: #80aed7a6;
-	align-content: center;
-	text-align: center;
-	border-radius: 1em;
-	margin: 1em 1em;
-	font-size: larger;
-	color: white;
+    position: absolute;
+    width: 2em;
+    height: 2em;
+    background: #80aed7a6;
+    align-content: center;
+    text-align: center;
+    border-radius: 1em;
+    margin: 1em 1em;
+    font-size: larger;
+    color: white;
 }
 .compteur::before {
-	content: "🎈";
-	filter: brightness(200%);
+    content: "🎈";
+    filter: brightness(200%);
 }
 
 #chrono {
     position: absolute;
-    width: 4em;
-	height: 2.5em;
-	background: #80aed7a6;
-	align-content: center;
-	text-align: center;
-	border-radius: 1.25em;
-	margin: 0.6em auto;
-	font-size: xx-large;
-	color: white;
+    /*width: 4em;*/
+    padding: 0em 0.5em;
+    height: 2.5em;
+    background: #80aed7a6;
+    align-content: center;
+    text-align: center;
+    border-radius: 1.25em;
+    margin: 0.6em auto;
+    font-size: xx-large;
+    color: white;
 }
 #chrono::before{
     content: "⏱ ";
 }
+#chrono::after{
+    content: "⏸ ";
+}
+
 
 /* Animations */
 .pulse {
@@ -166,23 +172,43 @@
 
 /*modals*/
 .modalsContainer {
-	position: absolute;
-	width: 100%;
-	height: 100%;
-	background: #bed3e65e;
-	backdrop-filter: blur(2px);
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: #bed3e65e;
+    backdrop-filter: blur(2px);
     display: flex;
 }
 .modal-content {
+    align-content: center;
+    text-align: center;
+    width: 90%;
+    height: 90%;
+    background: #938ba6c7;
+    color: white;
+    font-size: large;
+    margin: auto;
+    border-radius: 0.6em;
+}
+
+.modal-content p {font-size: medium;}
+
+button {
+	/* position: absolute; */
+	/* width: 4em; */
+	padding: 0.25em 1em;
+	/* height: 1.5em; */
+	background: #80aed7;
 	align-content: center;
 	text-align: center;
-	width: 90%;
-	height: 90%;
-	background: #938ba6c7;
+	border-radius: 1.25em;
+	margin: 0.25em auto;
+	font-size: large;
 	color: white;
-	font-size: xx-large;
-	margin: auto;
-    border-radius: 0.6em;
+	border: 3px solid white;
+	/* box-shadow: 3px 3px 7px #00000091; */
+	/* border: none; */
+	box-shadow: inset 0px 0px 8px;
 }
 
 .hide {display: none;}
@@ -212,7 +238,11 @@
         const zones=document.getElementById("vote_zones");
         const chrono={tps:0,el:document.getElementById("chrono"),start:"",pause:0,init:""};//seconds
         const pick={}
+        //var animationRequest="";
         //var pause=0,paused=0;
+        const lesBallons=[];
+        var storedBallons=[];
+        var voteId=localStorage.getItem("onGoingVote");
 
     class voteZone {
   constructor(id) {
@@ -237,17 +267,18 @@
 
   }
 
-        const keep=new voteZone("keep"),voting=new voteZone("voting"),bin=new voteZone("bin");
+    const keep=new voteZone("keep"),voting=new voteZone("voting"),bin=new voteZone("bin");
 
     class Ballon {
         constructor(titre, content="none", zone=voting.zone) {
-            this.zone = zone;
-            this.zoneId=zone.id;
+            let b=localStorage.onGoinVote && inStore(titre);
+            this.zoneId=b?.zoneId || zone.id;
+            this.zone = document?.getElementById(b?.zoneId) || zone;
             this.id = titre;
-            this.x = 0;
-            this.y = 0;
-            this.v = (Math.random() * 2 + 0.3);
-            this.h=0;
+            this.x = b?.x || 0;
+            this.y = b?.y || 0;
+            this.v = b?.v || (Math.random() * 2 + 0.3);
+            this.h=b?.h || 0;
             this.ballonElement = document.createElement('div');
             this.ballonElement.className = 'ballon';
             this.ballonElement.id = titre;
@@ -256,24 +287,25 @@
             this.zone.appendChild(this.ballonElement);
             let theZone=Zones.find((z)=>((z.id+"_zone")==this.zoneId));
             theZone.add(this.id);
-            this.positionBallon();
-
+            this.positionBallon(b?.x,b?.y);
             //this.moveInterval = this.moveBallon();
-            this.setPastelColor();
+            this.setPastelColor(b?.color);
         }
 
-        positionBallon() {
+        positionBallon(bx="",by="") {
             const zoneRect = this.zone.getBoundingClientRect();
             const randomX = Math.floor(Math.random() * (zoneRect.width - this.ballonElement.offsetWidth));
             const randomY = Math.floor(Math.random() * (zoneRect.height - this.ballonElement.offsetHeight));
-            this.x = randomX;
-            this.y = randomY;
-            this.ballonElement.style.left = `${Math.floor(100*randomX/zoneRect.width)}%`;
-            this.ballonElement.style.top = `${Math.floor(100*randomY/zoneRect.height)}%`;
+            let nX = Math.floor(100*randomX/zoneRect.width);
+            let nY = Math.floor(100*randomY/zoneRect.height);
+            this.x=bx || nX;
+            this.y=by || nY;
+            this.ballonElement.style.left = `${nX}%`;
+            this.ballonElement.style.top = `${nY}%`;
         }
         
-        setPastelColor() {
-            this.color = generatePastelColor();
+        setPastelColor(c="") {
+            this.color = c || generatePastelColor();
             this.ballonElement.style.backgroundColor = this.color;
         }
     }
@@ -287,10 +319,6 @@
 
         // let voteView=zones.getClientRects();
         // let X=voteView.right;
-        
-        const candidats=["image1.jpg","image2.jpg","image3.png","image4.png","image5.png","image6.png","image7.png"];//,"<b>2</b>","<b>3</b>","<b>4</b>","<b>5</b>","<b>16</b>"];
-        const lesBallons=[];
-        candidats.forEach ((b,i)=>{lesBallons[i] = new Ballon(b,b);});
 
 // prevent unwanted selection
 function clearSelection()
@@ -371,6 +399,7 @@ function clearSelection()
                             //move ballon to next zone left if there is one
                             nZonePos=Math.max(pick.zonePos-1,0);
                         }
+                    store();
                     console.log(pick.zonePos,', ',deltaX,', ',nZonePos)
                     Zones[nZonePos].zone.appendChild(theBallonEl);
                     let r=Zones[oZonePos].remove(pick.ballonId);
@@ -428,6 +457,7 @@ function runVotes(n){
         chrono.lastds=n;
             //console.log(ds);
             if(ds>0 && chrono.tps>0){
+                chrono.runtime+=ds;
                 chrono.tps=Math.max(chrono.tps-ds,0);
                 chrono.el.innerHTML=Math.ceil(chrono.tps)+"s";
                 //chrono.lastds=ds;
@@ -449,16 +479,19 @@ function runVotes(n){
 
 
 function pauseVoting(){
-    chrono.pause=Date.now();modal("relance");
+    chrono.pause=Date.now();
+    modal("relance");
 }
 
-function startVoting(temps=3*lesBallons.length){
+function startVoting(temps=2.5*lesBallons.length){
     chrono.tps=temps;
-    if(!chrono.init){chrono.init=Date.now(); chrono.runtime=0;}
-    chrono.el.innerHTML=chrono.tps+"s";
+    if(!chrono.init){chrono.init=store(); chrono.runtime=0;let chronoStored=localStorage.getItem("chrono"+chrono.init);if(chronoStored){
+        chrono.tps=chronoStored.tps;chrono.start=chronoStored.start;chrono.runtime=chronoStored.runtime;chrono.pause=chronoStored.pause;chrono.lastds=chronoStored.lastds;
+    }}else{store(chrono.init);}
+    chrono.el.innerHTML=Math.floor(chrono.tps)+"s";
     chrono.el.classList.remove("pulse","warning_color");
     chrono.start=true;
-    requestAnimationFrame(runVotes)
+    requestAnimationFrame(runVotes);
 }
 
 function endVoting(){
@@ -473,18 +506,24 @@ const modals={
     "welcome":{"content":`<h2>Bienvenue !</h2>
             <button id="démarrer">Démarrer</button>`,
             "démarrer":function (){console.log("démarrer");startVoting()}},
-    "voted":{"content":`<h2>Bien joué !</h2>
-            <button id="rejouer">Rejouer 😉</button>
-            <ul><li>ballon 1</li><li>ballon 3</li></ul>
-            <button id="mail">Envoyer les résultats</button>`,
+    "voted":{"content":function(){
+            store();localStorage.setItem("onGoingVote","");localStorage.setItem("chrono"+chrono.init,"");
+            chrono.init="";
+            return `<h2>Bien joué !</h2><p>
+            ${report()}</p>
+            <button id="mail">Envoyer les résultats ✉</button><br>
+            <button id="rejouer">Rejouer 😉</button>`},
             "mail":function (){console.log("sauver ",lesBallons);mail("o@m.com","Résultat de mon vote",`${JSON.stringify(lesBallons)}`)},"rejouer":function (){location.reload();}},
-    "relance":{"content": function(){let rtps=chrono.tps; let titre;if(rtps==0){titre="Le temps est écoulé!"}else{titre="Plus que "+Math.ceil(rtps)+" secondes"};
+    "relance":{"content": function(){
+            store();
+            let rtps=chrono.tps; let titre;if(rtps==0){titre="Le temps est écoulé!"}else{titre="Plus que "+Math.ceil(rtps)+" secondes"};
             let htmlcontent = `<h2>${titre}</h2>
             <p>Il reste ${voting.votes.length} ballons.</p>
             <button id="finir">Finir!</button>`;
             return htmlcontent;
         },
-            "finir":function(){chrono.pause="";startVoting(3*voting.votes.length)}},
+            "finir":function(){chrono.pause="";
+            startVoting(chrono.tps || 3*voting.votes.length)}},
     "Merci":{"content":`<h2>Merci</h2>
             <p>votre gestionnaire de courriel va s'ouvrir pour envoyer vos résultats.<br>Merci d'avoir voter</p>
             <button id="rejouer">Rejouer ?</button>`,
@@ -492,23 +531,25 @@ const modals={
     }
 function modal(mId){
     const modalEl=document.getElementById("modalsContainer");
+    modalEl.innerHTML="";
     const modal=modals[mId];
     const mcontent=document.createElement("div");
+    mcontent.id=mId;
     mcontent.classList.add('modal-content');
     mcontent.innerHTML=typeof(modal.content)=="function"?modal.content():modal.content;
     modalEl.appendChild(mcontent);
     modalEl.classList.remove("hide");
-    modalEl.addEventListener("click",function(e){
-        console.log(e);
+    mcontent.addEventListener("click",function (e){
         if(modal[e.target.id]){
+            event.stopPropagation()
             modalEl.classList.add("hide");
             modalEl.innerHTML="";
             modal[e.target.id]()}
-        //modal?.[e.target.id]()
-    })
+    });
 }
-//
+// event listeners declared once only for chrono
 document.getElementById("chrono").addEventListener('click', ()=>pauseVoting());
+
 //mail results
 function mail(to,subject,content){
     //window.open(`mailto:${to}}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(content)}`);
@@ -516,7 +557,60 @@ function mail(to,subject,content){
     modal("Merci");
 }
 
-modal("welcome")
+//Analyse results
+function report(){
+    let summary="You voted in "+Math.round(chrono.runtime)+"s.\r\nYou like the following logos :\r\n"+JSON.stringify(keep.votes)+"But you do not like those :\r\n"+JSON.stringify(keep.votes)
+    if(voting.votes.length>0){summary += "\r\n... and you did not made up your mind for "+JSON.stringify(voting.votes)+"!"}
+
+    return summary
+    /*
+    results.forEach ((b,i)=>{lesBallons[i] = new Ballon(b,b);});
+
+    [{
+        "zone": {},
+        "zoneId": "voting_zone",
+        "id": "logo_1.png",
+        "x": 489,
+        "y": 32.290562205285326,
+        "v": 1.4722770302165944,
+        "h": 0,
+        "ballonElement": {},
+        "color": "rgb(155, 146, 132)"
+    },
+    {
+        "zone": {},
+        "zoneId": "voting_zone",
+        "id": "logo_10.png",
+        "x": 834,
+        "y": 643.3520026312981,
+        "v": 1.2385970421491612,
+        "h": 0,
+        "ballonElement": {},
+        "color": "rgb(148, 223, 227)"
+    }...]*/
+}
+//
+function store(voteId=chrono.init || Date.now()){
+    localStorage.setItem("onGoingVote",voteId);
+    localStorage.setItem(voteId,JSON.stringify(lesBallons));
+    localStorage.setItem("chrono"+chrono.init,JSON.stringify(chrono));
+    storedBallons=lesBallons;
+    return voteId
+}
+function inStore(ballonId,vote=localStorage.getItem("onGoingVote")){
+    storedBallons?.length>0 || (storedBallons=JSON.parse(localStorage.getItem(vote)));
+    return storedBallons?.find((b) => b.id==ballonId)
+}
+// Go !
+document.addEventListener("DOMContentLoaded", function() {
+    //recup onGoingVote
+    const candidats=["image1.jpg","image2.jpg","image3.png","image4.png","image5.png","image6.png","image7.png"];//,"<b>2</b>","<b>3</b>","<b>4</b>","<b>5</b>","<b>16</b>"];
+        //const candidats=["logo_1.png","logo_10.png","logo_11.png","logo_12.png","logo_13.png","logo_14.png","logo_15.png","logo_16.png","logo_17.png","logo_18.png","logo_19.png","logo_2.png","logo_20.png","logo_21.png","logo_22.png","logo_23.png","logo_24.png","logo_25.png","logo_26.png","logo_27.png","logo_28.png","logo_29.png","logo_3.png","logo_30.png","logo_31.png","logo_32.png","logo_33.png","logo_34.png","logo_35.png","logo_36.png","logo_37.png","logo_3t.png","logo_4.png","logo_5.png","logo_6.png","logo_7.png","logo_8.png","logo_9.png"];//,"<b>2</b>","<b>3</b>","<b>4</b>","<b>5</b>","<b>16</b>"]
+        candidats.forEach ((b,i)=>{lesBallons[i] = new Ballon(b,b);});
+    addEventListener("visibilitychange", (e) => {pauseVoting()});
+    modal("welcome");
+});
+
 
 
     </script>
