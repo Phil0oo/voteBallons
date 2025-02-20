@@ -8,13 +8,14 @@
     <style>
         :root{
             --ballon_width:50px;
-            --ballon_height:75px
-            --zones_width:800px;
-            --zones_height:600px;
+            --ballon_height:75px;
+            --zoom:2;
+            --gray:100%;
         }
         .votesContainer {
             position: absolute;
             width: 95%;
+            /*min-width: 470px;*/
             height: 95%;
             /*border: 1px solid brown;*/
             overflow: hidden;
@@ -31,6 +32,7 @@
             margin: 0px;
             padding: 0px;
             width: 100%;
+            min-width: 470px;
             height: 100%;
             /*border: 1px solid brown;*/
             overflow: hidden;
@@ -61,8 +63,8 @@
 
         .ballon {
             position: absolute;
-            width: 50px;
-            height: 75px;
+            width: var(--ballon_width);
+            height: var(--ballon_height);
             background-color: red;
             color: white;
             display: flex;
@@ -76,19 +78,26 @@
         .ballon img {
             width: 80%;
             max-height: var(--ballon_width);
-            filter: grayscale(100%);
+            filter: grayscale(var(--gray));
             pointer-events: none;
         }
 
+/*        img:before {
+            content: attr(alt);
+            display: block;
+            margin-bottom: 10px;
+        }
+not working */
+
         .ballon.clicked {
-            transform: scale(2);
+            transform: scale(var(--zoom));
             z-index: 10;
         }
         .ballon.clicked:hover {cursor: none;}
 
         .compteur {
     position: absolute;
-    width: 2em;
+    min-width: 2em;
     height: 2em;
     background: #80aed7a6;
     align-content: center;
@@ -117,10 +126,10 @@
     color: white;
 }
 #chrono::before{
-    content: "⏱ ";
+    content: "⏱";
 }
 #chrono::after{
-    content: "⏸ ";
+    content: "⏸";
 }
 
 
@@ -191,24 +200,27 @@
     border-radius: 0.6em;
 }
 
-.modal-content p {font-size: medium;}
+.modal-content p {
+    /*font-size: medium;*/
+    white-space: pre-line;
+}
 
 button {
-	/* position: absolute; */
-	/* width: 4em; */
-	padding: 0.25em 1em;
-	/* height: 1.5em; */
-	background: #80aed7;
-	align-content: center;
-	text-align: center;
-	border-radius: 1.25em;
-	margin: 0.25em auto;
-	font-size: large;
-	color: white;
-	border: 3px solid white;
-	/* box-shadow: 3px 3px 7px #00000091; */
-	/* border: none; */
-	box-shadow: inset 0px 0px 8px;
+    /* position: absolute; */
+    /* width: 4em; */
+    padding: 0.25em 1em;
+    /* height: 1.5em; */
+    background: #80aed7;
+    align-content: center;
+    text-align: center;
+    border-radius: 1.25em;
+    margin: 0.25em auto;
+    font-size: large;
+    color: white;
+    border: 3px solid white;
+    /* box-shadow: 3px 3px 7px #00000091; */
+    /* border: none; */
+    box-shadow: inset 0px 0px 8px;
 }
 
 .hide {display: none;}
@@ -233,6 +245,7 @@ button {
     </div>
     </div>
     <script>
+        const mailReportTo="omg@incredible.org"
         const moveTriggerX=15;
         const Zones=[];
         const zones=document.getElementById("vote_zones");
@@ -271,18 +284,18 @@ button {
 
     class Ballon {
         constructor(titre, content="none", zone=voting.zone) {
-            let b=localStorage.onGoinVote && inStore(titre);
+            let b=localStorage.onGoingVote && inStore(titre);
             this.zoneId=b?.zoneId || zone.id;
             this.zone = document?.getElementById(b?.zoneId) || zone;
             this.id = titre;
             this.x = b?.x || 0;
             this.y = b?.y || 0;
-            this.v = b?.v || (Math.random() * 2 + 0.3);
+            this.v = b?.v || (Math.random() * 0.25 + 0.2);
             this.h=b?.h || 0;
             this.ballonElement = document.createElement('div');
             this.ballonElement.className = 'ballon';
             this.ballonElement.id = titre;
-            this.ballonElement.innerHTML = content=="none"?titre:`<img src="./${content}" alt="image ${content} for ${titre}" />`;
+            this.ballonElement.innerHTML = content=="none"?titre:`<img src="./${content}" alt="image ${content}" class="hide" onload="this.classList.remove('hide')"/>`;
             this.ballonElement.title=titre;
             this.zone.appendChild(this.ballonElement);
             let theZone=Zones.find((z)=>((z.id+"_zone")==this.zoneId));
@@ -399,7 +412,7 @@ function clearSelection()
                             //move ballon to next zone left if there is one
                             nZonePos=Math.max(pick.zonePos-1,0);
                         }
-                    store();
+                    store(chrono.init);
                     console.log(pick.zonePos,', ',deltaX,', ',nZonePos)
                     Zones[nZonePos].zone.appendChild(theBallonEl);
                     let r=Zones[oZonePos].remove(pick.ballonId);
@@ -443,10 +456,10 @@ function moveBallon(b) {
             const zoneRect = b.zone.getBoundingClientRect();
                 if(!b.ballonElement.classList.contains("clicked")){
                     b.y -= b.v;
-                    if (b.y <= 0 - b.ballonElement.offsetHeight) {
-                        b.y = zoneRect.height + b.ballonElement.offsetHeight;
+                    if (b.y <= 0 - 100*(b.ballonElement.offsetHeight/zoneRect.height)) {
+                        b.y = 100 + b.ballonElement.offsetHeight/zoneRect.height;
                     }
-                    b.ballonElement.style.top = `${100*b.y/zoneRect.height}%`;
+                    b.ballonElement.style.top = `${b.y}%`;
                 }
             }
 
@@ -457,20 +470,21 @@ function runVotes(n){
         chrono.lastds=n;
             //console.log(ds);
             if(ds>0 && chrono.tps>0){
+                let dt=-Math.ceil(chrono.tps);
                 chrono.runtime+=ds;
                 chrono.tps=Math.max(chrono.tps-ds,0);
+                dt+=Math.ceil(chrono.tps);
                 chrono.el.innerHTML=Math.ceil(chrono.tps)+"s";
                 //chrono.lastds=ds;
-                if(chrono.tps<=10 && !chrono.el.classList.contains("pulse")){chrono.el.classList.add("pulse")};
-                if(chrono.tps<=5 && !chrono.el.classList.contains("warning_color")){chrono.el.classList.add("warning_color")}
-
+                if(chrono.tps<=10 && !chrono.el.classList.contains("pulse") && dt!=0){chrono.el.classList.add("pulse")};
+                if(chrono.tps<=5 && !chrono.el.classList.contains("warning_color") && dt!=0){chrono.el.classList.add("warning_color")}
+                lesBallons.forEach((b)=>moveBallon(b))
             }
             if(chrono.tps==0){
                 //chrono.pause=Date.now();modal("relance");
                 pauseVoting();
                 return;
             }
-        lesBallons.forEach((b)=>moveBallon(b))
         requestAnimationFrame(runVotes);
     }    
 //    requestAnimationFrame(runVotes);
@@ -480,14 +494,24 @@ function runVotes(n){
 
 function pauseVoting(){
     chrono.pause=Date.now();
+    chrono.el.classList.remove("pulse","warning_color");
     modal("relance");
 }
 
 function startVoting(temps=2.5*lesBallons.length){
     chrono.tps=temps;
-    if(!chrono.init){chrono.init=store(); chrono.runtime=0;let chronoStored=localStorage.getItem("chrono"+chrono.init);if(chronoStored){
-        chrono.tps=chronoStored.tps;chrono.start=chronoStored.start;chrono.runtime=chronoStored.runtime;chrono.pause=chronoStored.pause;chrono.lastds=chronoStored.lastds;
-    }}else{store(chrono.init);}
+    chrono.init=chrono.init || localStorage.onGoingVote || "";
+    if(!chrono.init){
+        chrono.init=store(); chrono.runtime=0;
+    }//else{store(chrono.init);}
+    let chronoStored=JSON.parse(localStorage.getItem("chrono"+chrono.init));
+    if(chronoStored){
+        chrono.tps=chronoStored.tps;
+        //chrono.start=chronoStored.start;
+        chrono.runtime=chronoStored.runtime;
+        //chrono.pause=chronoStored.pause;
+        //chrono.lastds=chronoStored.lastds;
+    }
     chrono.el.innerHTML=Math.floor(chrono.tps)+"s";
     chrono.el.classList.remove("pulse","warning_color");
     chrono.start=true;
@@ -497,33 +521,38 @@ function startVoting(temps=2.5*lesBallons.length){
 function endVoting(){
     console.log("end?");
     chrono.pause=Date.now(); //stop ballon animation and chrono
-    modal("voted");
+    chrono.el.classList.remove("pulse","warning_color");
+    modal("à_voté");
     console.log("end!",chrono.pause);
 }
 
 //modals
 const modals={
-    "welcome":{"content":`<h2>Bienvenue !</h2>
+    "bienvenue":{"content":`<h2>Bienvenue !</h2>
             <button id="démarrer">Démarrer</button>`,
             "démarrer":function (){console.log("démarrer");startVoting()}},
-    "voted":{"content":function(){
-            store();localStorage.setItem("onGoingVote","");localStorage.setItem("chrono"+chrono.init,"");
+    "à_voté":{"content":function(){
+            store(chrono.init);localStorage.setItem("onGoingVote","");localStorage.setItem("chrono"+chrono.init,"");
             chrono.init="";
             return `<h2>Bien joué !</h2><p>
             ${report()}</p>
-            <button id="mail">Envoyer les résultats ✉</button><br>
-            <button id="rejouer">Rejouer 😉</button>`},
-            "mail":function (){console.log("sauver ",lesBallons);mail("o@m.com","Résultat de mon vote",`${JSON.stringify(lesBallons)}`)},"rejouer":function (){location.reload();}},
+            <button id="mail">Envoyer les résultats ?</button><br>
+            <button id="rejouer">Rejouer 😀</button>`},
+            "mail":function (){console.log("sauver ",lesBallons);mail(mailReportTo,"Résultat de mon vote",`${report()}`);},"rejouer":function (){location.reload();}},
     "relance":{"content": function(){
-            store();
+            store(chrono.init);
             let rtps=chrono.tps; let titre;if(rtps==0){titre="Le temps est écoulé!"}else{titre="Plus que "+Math.ceil(rtps)+" secondes"};
             let htmlcontent = `<h2>${titre}</h2>
             <p>Il reste ${voting.votes.length} ballons.</p>
-            <button id="finir">Finir!</button>`;
+            <button id="finir">Finir!</button>
+            <p>Ou ...</p>
+            <button id="mail">Envoyer les résultats ?</button><br>
+            `;
             return htmlcontent;
+            },
+            "finir":function(){chrono.pause="";chrono.tps=chrono.tps || 2.5*voting.votes.length;store(chrono.init);startVoting(chrono.tps)},
+            "mail":function (){console.log("sauver ",lesBallons);mail(mailReportTo,"Résultat de mon vote",`${report()}`);},
         },
-            "finir":function(){chrono.pause="";
-            startVoting(chrono.tps || 3*voting.votes.length)}},
     "Merci":{"content":`<h2>Merci</h2>
             <p>votre gestionnaire de courriel va s'ouvrir pour envoyer vos résultats.<br>Merci d'avoir voter</p>
             <button id="rejouer">Rejouer ?</button>`,
@@ -552,15 +581,15 @@ document.getElementById("chrono").addEventListener('click', ()=>pauseVoting());
 
 //mail results
 function mail(to,subject,content){
-    //window.open(`mailto:${to}}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(content)}`);
-    window.location.href = `mailto:${to}}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(content)}`;
+    window.open(`mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(content)}`);
+    //window.location.href = `mailto:${to}}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(content)}`;
     modal("Merci");
 }
 
 //Analyse results
 function report(){
-    let summary="You voted in "+Math.round(chrono.runtime)+"s.\r\nYou like the following logos :\r\n"+JSON.stringify(keep.votes)+"But you do not like those :\r\n"+JSON.stringify(keep.votes)
-    if(voting.votes.length>0){summary += "\r\n... and you did not made up your mind for "+JSON.stringify(voting.votes)+"!"}
+    let summary="⏱ "+Math.round(chrono.runtime)+"s.\r\n🎈 👍 : "+JSON.stringify(keep.votes)+"\r\n🎈 👎 : "+JSON.stringify(keep.votes)
+    if(voting.votes.length>0){summary += "\r\n🎈 🤔 : "+JSON.stringify(voting.votes)}
 
     return summary
     /*
@@ -604,11 +633,14 @@ function inStore(ballonId,vote=localStorage.getItem("onGoingVote")){
 // Go !
 document.addEventListener("DOMContentLoaded", function() {
     //recup onGoingVote
+
     const candidats=["image1.jpg","image2.jpg","image3.png","image4.png","image5.png","image6.png","image7.png"];//,"<b>2</b>","<b>3</b>","<b>4</b>","<b>5</b>","<b>16</b>"];
-        //const candidats=["logo_1.png","logo_10.png","logo_11.png","logo_12.png","logo_13.png","logo_14.png","logo_15.png","logo_16.png","logo_17.png","logo_18.png","logo_19.png","logo_2.png","logo_20.png","logo_21.png","logo_22.png","logo_23.png","logo_24.png","logo_25.png","logo_26.png","logo_27.png","logo_28.png","logo_29.png","logo_3.png","logo_30.png","logo_31.png","logo_32.png","logo_33.png","logo_34.png","logo_35.png","logo_36.png","logo_37.png","logo_3t.png","logo_4.png","logo_5.png","logo_6.png","logo_7.png","logo_8.png","logo_9.png"];//,"<b>2</b>","<b>3</b>","<b>4</b>","<b>5</b>","<b>16</b>"]
+    //const candidats=["logo_1.png","logo_10.png","logo_11.png","logo_12.png","logo_13.png","logo_14.png","logo_15.png","logo_16.png","logo_17.png","logo_18.png","logo_19.png","logo_2.png","logo_20.png","logo_21.png","logo_22.png","logo_23.png","logo_24.png","logo_25.png","logo_26.png","logo_27.png","logo_28.png","logo_29.png","logo_3.png","logo_30.png","logo_31.png","logo_32.png","logo_33.png","logo_34.png","logo_35.png","logo_36.png","logo_37.png","logo_3t.png","logo_4.png","logo_5.png","logo_6.png","logo_7.png","logo_8.png","logo_9.png"];
         candidats.forEach ((b,i)=>{lesBallons[i] = new Ballon(b,b);});
-    addEventListener("visibilitychange", (e) => {pauseVoting()});
-    modal("welcome");
+    addEventListener("visibilitychange", (e) => {
+        if (document.getElementById("modalsContainer").classList.contains("hide")){pauseVoting()};
+    });
+    modal("bienvenue");
 });
 
 
