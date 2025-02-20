@@ -538,7 +538,7 @@ const modals={
             ${report()}</p>
             <button id="mail">Envoyer les résultats ?</button><br>
             <button id="rejouer">Rejouer 😀</button>`},
-            "mail":function (){console.log("sauver ",lesBallons);mail(mailReportTo,"Résultat de mon vote",`${report()}`);},"rejouer":function (){location.reload();}},
+            "mail":function (){console.log("sauver ",lesBallons);mail(mailReportTo,"Résultat de mon vote",`${report()}`);if(voting.votes.length==0){localStorage.clear()}},"rejouer":function (){location.reload();}},
     "relance":{"content": function(){
             store(chrono.init);
             let rtps=chrono.tps; let titre;if(rtps==0){titre="Le temps est écoulé!"}else{titre="Plus que "+Math.ceil(rtps)+" secondes"};
@@ -551,7 +551,7 @@ const modals={
             return htmlcontent;
             },
             "finir":function(){chrono.pause="";chrono.tps=chrono.tps || 2.5*voting.votes.length;store(chrono.init);startVoting(chrono.tps)},
-            "mail":function (){console.log("sauver ",lesBallons);mail(mailReportTo,"Résultat de mon vote",`${report()}`);},
+            "mail":function (){console.log("sauver ",lesBallons);mail(mailReportTo,"Résultat de mon vote",`${report()}`);if(voting.votes.length==0){localStorage.clear()}},
         },
     "Merci":{"content":`<h2>Merci</h2>
             <p>votre gestionnaire de courriel va s'ouvrir pour envoyer vos résultats.<br>Merci d'avoir voter</p>
@@ -588,7 +588,7 @@ function mail(to,subject,content){
 
 //Analyse results
 function report(){
-    let summary="⏱ "+Math.round(chrono.runtime)+"s.\r\n🎈 👍 : "+JSON.stringify(keep.votes)+"\r\n🎈 👎 : "+JSON.stringify(keep.votes)
+    let summary="⏱ "+Math.round(chrono.runtime)+"s.\r\n🎈 👍 : "+JSON.stringify(keep.votes)+"\r\n🎈 👎 : "+JSON.stringify(bin.votes)
     if(voting.votes.length>0){summary += "\r\n🎈 🤔 : "+JSON.stringify(voting.votes)}
 
     return summary
